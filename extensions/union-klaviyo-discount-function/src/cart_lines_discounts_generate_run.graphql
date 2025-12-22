@@ -1,0 +1,31 @@
+query RunInput {
+  discount {
+    discountClasses
+  }
+  cart {
+    lines {
+      id
+      quantity
+      cost {
+        subtotalAmount {
+          amount
+        }
+        amountPerQuantity {
+          amount
+        }
+        compareAtAmountPerQuantity {
+          amount
+        }
+      }
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+          product {
+            id
+          }
+        }
+      }
+    }
+  }
+}
