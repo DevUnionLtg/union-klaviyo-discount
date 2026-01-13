@@ -32,6 +32,9 @@ export function cartLinesDiscountsGenerateRun(input) {
     return {operations: []};
   }
 
+  const configuration = parseConfiguration(input.discount.metafield?.value);
+  console.log('Configuration:', configuration);
+
   console.log('Cart lines count:', input.cart.lines.length);
 
   const eligibleCartLines = [];
@@ -48,6 +51,13 @@ export function cartLinesDiscountsGenerateRun(input) {
         console.log(`  -> EXCLUDED: Variant has compareAtPrice of ${compareAtPrice}`);
         return;
       }
+
+      if (configuration.productIds && configuration.productIds.length > 0) {
+        if (!configuration.productIds.includes(variant.product.id)) {
+          console.log(`  -> EXCLUDED: Product ${variant.product.id} not in configured product IDs`);
+          return;
+        }
+      }
       
       console.log(`  -> ELIGIBLE: Adding to targets`);
       eligibleCartLines.push(line);
@@ -63,22 +73,22 @@ export function cartLinesDiscountsGenerateRun(input) {
 
   const operations = [];
 
-  // Fixed 20% discount
-  const DISCOUNT_PERCENTAGE = 20;
-  const discountValue = { 
-    percentage: { 
-      value: DISCOUNT_PERCENTAGE 
-    } 
-  };
+  const discountValue = configuration.discountType === 'percentage'
+    ? { percentage: { value: configuration.discountValue } }
+    : { fixedAmount: { amount: configuration.discountValue } };
 
-  console.log('Applying fixed discount:', DISCOUNT_PERCENTAGE + '%');
+  const discountMessage = configuration.discountType === 'percentage'
+    ? `${configuration.discountValue}% OFF PRODUCT`
+    : `$${configuration.discountValue} OFF PRODUCT`;
+
+  console.log('Applying discount:', discountMessage);
 
   if (hasProductDiscountClass) {
     operations.push({
       productDiscountsAdd: {
         candidates: [
           {
-            message: `${DISCOUNT_PERCENTAGE}% OFF PRODUCT`,
+            message: discountMessage,
             targets: eligibleCartLines.map(line => ({
               cartLine: {
                 id: line.id,
@@ -99,4 +109,37 @@ export function cartLinesDiscountsGenerateRun(input) {
   return {
     operations,
   };
+}
+
+function parseConfiguration(metafieldValue) {
+  const defaultConfig = {
+    discountType: 'percentage',
+    discountValue: 20,
+    productIds: [],
+    collections: []
+  };
+
+  if (!metafieldValue) {
+    return defaultConfig;
+  }
+
+  try {
+    const parsed = JSON.parse(metafieldValue);
+    const discountType = parsed.percentage ? 'percentage' : 'amount';
+    const discountValue = parsed.percentage || parsed.amount || 20;
+    
+    const productIds = parsed.productIds 
+      ? parsed.productIds.split(',').map(id => id.trim()).filter(id => id)
+      : [];
+    
+    return {
+      discountType,
+      discountValue,
+      productIds,
+      collections: parsed.collections || []
+    };
+  } catch (error) {
+    console.error('Error parsing metafield configuration:', error);
+    return defaultConfig;
+  }
 }

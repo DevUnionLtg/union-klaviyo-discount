@@ -1,6 +1,9 @@
 query RunInput {
   discount {
     discountClasses
+    metafield(namespace: "$app:klaviyo-discount", key: "function-configuration") {
+      value
+    }
   }
   cart {
     lines {
