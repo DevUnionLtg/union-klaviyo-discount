@@ -18,7 +18,7 @@ export default async function handleRequest(
 
   return new Promise((resolve, reject) => {
     const { pipe, abort } = renderToPipeableStream(
-      reactRouterContext.render(),
+      reactRouterContext,
       {
         [callbackName]: () => {
           const body = new PassThrough();
