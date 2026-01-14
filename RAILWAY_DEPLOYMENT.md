@@ -17,6 +17,7 @@ Railway **不会**自动识别项目中的环境变量，你必须在 Railway �
 | `NODE_ENV` | Node 环境 | `production` |
 | `DATABASE_URL` | 数据库连接字符串 | 如果使用外部数据库，需要设置此项 |
 | `PRISMA_CLIENT_ENGINE_TYPE` | Prisma 引擎类型 | `binary` (如果在 Windows ARM64 环境遇到问题) |
+| `KLAVIYO_UPDATE_DISCOUNTCODE_ENDPOINT_URL` | Klaviyo webhook 端点 (可选) | 创建 discount 后发送数据的 Klaviyo/Azure 端点 URL（包含完整 URL 和 code 参数） |
 
 ### 在 Railway 中配置环境变量的步骤
 
@@ -32,12 +33,15 @@ Railway **不会**自动识别项目中的环境变量，你必须在 Railway �
 **Raw Editor 模式示例：**
 
 ```bash
-SHOPIFY_API_KEY=c105c25a989c9c6de122bc0981b4a912
-SHOPIFY_API_SECRET=your_actual_secret_here
+SHOPIFY_API_KEY=your_api_key_here
+SHOPIFY_API_SECRET=your_api_secret_here
 SHOPIFY_APP_URL=https://your-app.railway.app
 SCOPES=write_discounts,write_products
 NODE_ENV=production
+KLAVIYO_UPDATE_DISCOUNTCODE_ENDPOINT_URL=https://your-endpoint.azurewebsites.net/api/orders_create?code=YOUR_FUNCTION_KEY
 ```
+
+⚠️ **安全提示**: 不要在代码或文档中包含真实的 API keys 或 secrets！
 
 #### 方法二：通过 Railway CLI
 
@@ -52,11 +56,12 @@ railway login
 railway link
 
 # 设置环境变量
-railway variables set SHOPIFY_API_KEY=c105c25a989c9c6de122bc0981b4a912
-railway variables set SHOPIFY_API_SECRET=your_actual_secret_here
+railway variables set SHOPIFY_API_KEY=your_key_here
+railway variables set SHOPIFY_API_SECRET=your_secret_here
 railway variables set SHOPIFY_APP_URL=https://your-app.railway.app
 railway variables set SCOPES=write_discounts,write_products
 railway variables set NODE_ENV=production
+railway variables set KLAVIYO_UPDATE_DISCOUNTCODE_ENDPOINT_URL=your_klaviyo_endpoint_url
 ```
 
 ### 获取 SHOPIFY_API_SECRET
@@ -84,7 +89,7 @@ railway variables set NODE_ENV=production
 application_url = "https://your-app.railway.app"
 
 [auth]
-redirect_urls = [ "https://your-app.railway.app/api/auth" ]
+redirect_urls = [ "https://your-app.railway.app/auth/callback" ]
 ```
 
 3. 在 Shopify Partner Dashboard 中也需要更新相应的 URL：
@@ -154,6 +159,7 @@ A: 是的，应该包含完整的 URL，例如：`https://your-app.railway.app`�
 - [ ] 在 Railway Variables 中设置 `SHOPIFY_APP_URL`（使用 Railway 生成的域名）
 - [ ] 在 Railway Variables 中设置 `SCOPES`
 - [ ] 在 Railway Variables 中设置 `NODE_ENV=production`
+- [ ] 在 Railway Variables 中设置 `KLAVIYO_UPDATE_DISCOUNTCODE_ENDPOINT_URL`（如果使用 Klaviyo webhook）
 - [ ] 更新 `shopify.app.toml` 中的 URLs
 - [ ] 在 Shopify Partner Dashboard 中更新 App URL 和 redirect URLs
 - [ ] 配置数据库（SQLite 或 PostgreSQL）

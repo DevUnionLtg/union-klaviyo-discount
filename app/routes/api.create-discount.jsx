@@ -2,6 +2,45 @@ import db from "../db.server";
 
 const FUNCTION_NAME = "union-klaviyo-discount-function";
 
+const KLAVIYO_ENDPOINT = process.env.KLAVIYO_UPDATE_DISCOUNTCODE_ENDPOINT_URL
+/**
+ * Send discount code data to Azure endpoint
+ * @param {Object} data - Discount data to send
+ * @param {string} data.company_name - Company name
+ * @param {string} data.name - Contact name
+ * @param {string} data.discount_code - Generated discount code
+ */
+async function writeDiscountCodeBackToKlaviyo(data) {
+  try {
+    console.log(`Sending discount to Azure endpoint:`, data);
+    
+    const response = await fetch(KLAVIYO_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        company_name: data.company_name,
+        name: data.name,
+        discount_code: data.discount_code,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Klaviyo endpoint returned ${response.status}: ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log("Klaviyo endpoint response:", result);
+    
+    return result;
+  } catch (error) {
+    console.error("Error sending to Klaviyo endpoint:", error);
+    throw error;
+  }
+}
+
 function constructDiscountCode(company_name, name) {
   const sourceText = company_name || name || "";
   
@@ -239,6 +278,19 @@ export const action = async ({ request }) => {
     const discountId = discountCodeAppCreate?.codeAppDiscount?.discountId;
 
     console.log(`Successfully created discount code "${promo_code}" with ID: ${discountId}`);
+
+    // Send POST request to Azure endpoint
+    try {
+      await writeDiscountCodeBackToKlaviyo({
+        company_name: company_name || "",
+        name: name || "",
+        discount_code: promo_code,
+      });
+      console.log(`Successfully sent discount code to Azure endpoint`);
+    } catch (azureError) {
+      // Log error but don't fail the main request
+      console.error("Failed to send discount to Azure:", azureError.message);
+    }
 
     return new Response(
       JSON.stringify({
