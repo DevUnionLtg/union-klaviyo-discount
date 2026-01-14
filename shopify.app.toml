@@ -2,7 +2,7 @@
 
 client_id = "2539ee33b557aa51569cfbb14290a4d5"
 name = "union-klaviyo-discount"
-application_url = "https://example.com"
+application_url = "https://union-klaviyo-discount-production.up.railway.app"
 embedded = true
 
 [build]
@@ -25,4 +25,4 @@ api_version = "2026-01"
 scopes = "write_products, write_discounts"
 
 [auth]
-redirect_urls = [ "https://machines-duke-greensboro-holdings.trycloudflare.com/auth/callback" ]
+redirect_urls = [ "https://union-klaviyo-discount-production.up.railway.app/auth/callback" ]
