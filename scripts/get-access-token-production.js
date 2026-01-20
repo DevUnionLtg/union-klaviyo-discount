@@ -1,13 +1,13 @@
 import { PrismaClient } from "@prisma/client";
 
 /**
- * 生产环境获取 Access Token 脚本
+ * Production environment script to get Access Token
  * 
- * 使用方法:
- * 1. 设置环境变量 DATABASE_URL 指向生产数据库
- * 2. 运行: node scripts/get-access-token-production.js
+ * Usage:
+ * 1. Set DATABASE_URL environment variable pointing to production database
+ * 2. Run: node scripts/get-access-token-production.js
  * 
- * 或者直接指定数据库URL:
+ * Or directly specify database URL:
  * DATABASE_URL="postgresql://user:password@host:5432/dbname" node scripts/get-access-token-production.js
  */
 
@@ -45,7 +45,7 @@ async function verifyToken(shop, accessToken) {
 async function getAccessToken() {
   try {
     const dbUrl = process.env.DATABASE_URL || "file:dev.sqlite";
-    console.log(`\n🔗 连接数据库: ${dbUrl.replace(/:[^:@]+@/, ':****@')}\n`);
+    console.log(`\n🔗 Connecting to database: ${dbUrl.replace(/:[^:@]+@/, ':****@')}\n`);
 
     // Get all sessions
     const sessions = await prisma.session.findMany({
@@ -63,8 +63,8 @@ async function getAccessToken() {
     });
 
     if (sessions.length === 0) {
-      console.log("❌ 数据库中没有找到任何 session。");
-      console.log("请确保 app 已经安装并完成 OAuth 流程。");
+      console.log("❌ No sessions found in database.");
+      console.log("Please ensure the app is installed and OAuth flow is completed.");
       return;
     }
 
@@ -122,8 +122,8 @@ async function getAccessToken() {
   } catch (error) {
     console.error("❌ Error retrieving access token:", error.message);
     if (error.message.includes("connect")) {
-      console.error("\n💡 提示: 请检查 DATABASE_URL 环境变量是否正确设置");
-      console.error("   例如: DATABASE_URL=\"postgresql://user:password@host:5432/dbname\"");
+      console.error("\n💡 Tip: Please check if DATABASE_URL environment variable is set correctly");
+      console.error("   Example: DATABASE_URL=\"postgresql://user:password@host:5432/dbname\"");
     }
   } finally {
     await prisma.$disconnect();
@@ -131,6 +131,7 @@ async function getAccessToken() {
 }
 
 getAccessToken();
+
 
 
 

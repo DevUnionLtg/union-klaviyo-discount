@@ -1,67 +1,82 @@
 import db from "../db.server";
 
 const FUNCTION_NAME = "union-klaviyo-discount-function";
+const KLAVIYO_API_KEY = "pk_1c4122fec9e017680bdde6aac5a7893a10";
+const KLAVIYO_EVENTS_ENDPOINT = "https://a.klaviyo.com/api/events";
 
-const KLAVIYO_ENDPOINT = process.env.KLAVIYO_UPDATE_DISCOUNTCODE_ENDPOINT_URL
-/**
- * Send discount code data to Azure endpoint
- * @param {Object} data - Discount data to send
- * @param {string} data.company_name - Company name
- * @param {string} data.name - Contact name
- * @param {string} data.discount_code - Generated discount code
- */
-async function writeDiscountCodeBackToKlaviyo(data) {
+async function createKlaviyoEvent(data) {
   try {
-    console.log(`Sending discount to Azure endpoint:`, data);
+    console.log(`Creating Klaviyo event for email ${data.email} with discount code: ${data.discountCode}`);
     
-    const response = await fetch(KLAVIYO_ENDPOINT, {
+    const response = await fetch(KLAVIYO_EVENTS_ENDPOINT, {
       method: "POST",
       headers: {
+        "Authorization": `Klaviyo-API-Key ${KLAVIYO_API_KEY}`,
         "Content-Type": "application/json",
+        "revision": "2026-01-15",
       },
       body: JSON.stringify({
-        company_name: data.company_name,
-        name: data.name,
-        discount_code: data.discount_code,
+        data: {
+          type: "event",
+          attributes: {
+            metric: {
+              data: {
+                type: "metric",
+                attributes: {
+                  name: "Discount Code Created By Shopify App"
+                }
+              }
+            },
+            profile: {
+              data: {
+                type: "profile",
+                attributes: {
+                  email: data.email
+                }
+              }
+            },
+            properties: {
+              discount_code: data.discountCode,
+              source: "Wenbo's Shopify App"
+            }
+          }
+        }
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Klaviyo endpoint returned ${response.status}: ${errorText}`);
+      throw new Error(`Klaviyo API returned ${response.status}: ${errorText}`);
     }
 
     const result = await response.json();
-    console.log("Klaviyo endpoint response:", result);
+    console.log("Klaviyo event created successfully:", result);
     
     return result;
   } catch (error) {
-    console.error("Error sending to Klaviyo endpoint:", error);
+    console.error("Error creating Klaviyo event:", error);
     throw error;
   }
 }
 
-function constructDiscountCode(company_name, name) {
-  const sourceText = company_name || name || "";
+function constructDiscountCode(organization, firstName, lastName) {
+  const sourceText = organization || `${firstName || ""} ${lastName || ""}`.trim();
   
   if (!sourceText) {
-    throw new Error("Either company_name or name must be provided");
+    throw new Error("Either organization or name (first_name + last_name) must be provided");
   }
   
   const discountCode = sourceText
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
   
+  if (!discountCode) {
+    throw new Error("Failed to generate valid discount code from provided data");
+  }
+  
   return discountCode;
 }
 
-/**
- * Query Shopify Functions to get the function ID by name
- * @param {string} shopDomain - Shop domain
- * @param {string} accessToken - Shopify access token
- * @param {string} functionName - Function title/name to search for
- * @returns {Promise<string|null>} Function ID or null if not found
- */
 async function getFunctionId(shopDomain, accessToken, functionName) {
   try {
     const response = await fetch(
@@ -118,7 +133,6 @@ async function getFunctionId(shopDomain, accessToken, functionName) {
 }
 
 export const action = async ({ request }) => {
-  // Only allow POST requests
   if (request.method !== "POST") {
     return new Response(
       JSON.stringify({ success: false, error: "Method not allowed" }),
@@ -128,13 +142,23 @@ export const action = async ({ request }) => {
 
   try {
     const body = await request.json();
-    const { company_name, name, shop: requestShop } = body;
+    const { email, first_name, last_name, organization, shop: requestShop } = body;
 
-    if (!company_name && !name) {
+    if (!email) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "Either company_name or name is required" 
+          error: "Email is required" 
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!organization && !first_name && !last_name) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Either organization or name (first_name + last_name) is required" 
         }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
@@ -142,7 +166,7 @@ export const action = async ({ request }) => {
 
     let promo_code;
     try {
-      promo_code = constructDiscountCode(company_name, name);
+      promo_code = constructDiscountCode(organization, first_name, last_name);
     } catch (error) {
       return new Response(
         JSON.stringify({ 
@@ -153,15 +177,7 @@ export const action = async ({ request }) => {
       );
     }
 
-    if (!promo_code) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Failed to generate discount code" 
-        }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
+    console.log(`Generated discount code "${promo_code}" for email: ${email}`);
 
     // Get the session from database (dynamically detect shop domain)
     // If shop is provided in request, use it; otherwise get the most recent offline session
@@ -169,10 +185,10 @@ export const action = async ({ request }) => {
       where: requestShop
         ? {
             shop: requestShop,
-            isOnline: false, // Use offline token for API calls
+            isOnline: false,
           }
         : {
-            isOnline: false, // Use offline token for API calls
+            isOnline: false,
           },
       orderBy: {
         id: 'desc',
@@ -191,11 +207,9 @@ export const action = async ({ request }) => {
       );
     }
 
-    // Get shop domain from session
     const shopDomain = session.shop;
     console.log(`Creating discount code "${promo_code}" for shop: ${shopDomain}`);
 
-    // Get function ID dynamically
     console.log(`Querying function ID for: ${FUNCTION_NAME}`);
     const functionId = await getFunctionId(shopDomain, session.accessToken, FUNCTION_NAME);
 
@@ -211,7 +225,6 @@ export const action = async ({ request }) => {
 
     console.log(`Using function ID: ${functionId}`);
 
-    // Create discount code using Shopify Admin API
     const response = await fetch(
       `https://${shopDomain}/admin/api/2025-10/graphql.json`,
       {
@@ -250,7 +263,6 @@ export const action = async ({ request }) => {
     const result = await response.json();
     console.log("Shopify API response:", JSON.stringify(result, null, 2));
 
-    // Check for errors
     if (result.errors) {
       return new Response(
         JSON.stringify({ 
@@ -279,17 +291,14 @@ export const action = async ({ request }) => {
 
     console.log(`Successfully created discount code "${promo_code}" with ID: ${discountId}`);
 
-    // Send POST request to Azure endpoint
     try {
-      await writeDiscountCodeBackToKlaviyo({
-        company_name: company_name || "",
-        name: name || "",
-        discount_code: promo_code,
+      await createKlaviyoEvent({
+        email: email,
+        discountCode: promo_code,
       });
-      console.log(`Successfully sent discount code to Azure endpoint`);
-    } catch (azureError) {
-      // Log error but don't fail the main request
-      console.error("Failed to send discount to Azure:", azureError.message);
+      console.log(`Successfully created Klaviyo event for email ${email}`);
+    } catch (klaviyoError) {
+      console.error("Failed to create Klaviyo event:", klaviyoError.message);
     }
 
     return new Response(
@@ -297,6 +306,7 @@ export const action = async ({ request }) => {
         success: true,
         discountId,
         code: promo_code,
+        email: email,
       }),
       { status: 201, headers: { "Content-Type": "application/json" } }
     );
@@ -314,7 +324,6 @@ export const action = async ({ request }) => {
   }
 };
 
-// Handle GET requests with a helpful message
 export const loader = async () => {
   return new Response(
     JSON.stringify({
@@ -325,19 +334,34 @@ export const loader = async () => {
           "Content-Type": "application/json",
         },
         body: {
-          company_name: "abc design inc. (optional, preferred)",
-          name: "abc design (optional, used if company_name is empty)",
+          email: "{{person.email}} (required)",
+          first_name: "{{person.first_name}} (optional)",
+          last_name: "{{person.last_name}} (optional)",
+          organization: "{{person.organization}} (optional, preferred)",
           shop: "your-store.myshopify.com (optional)"
         },
-        note: "Shop domain is automatically detected from database session if not provided. Discount code is generated by removing punctuation/symbols and converting to uppercase.",
+        note: "Discount code is generated from organization or first_name + last_name. Shop domain is automatically detected from database session if not provided. After creating the discount in Shopify, a Klaviyo event is triggered.",
         examples: [
           {
-            input: { company_name: "abc design inc." },
-            output: "ABCDESIGNINC"
+            input: { 
+              email: "john@company.com",
+              organization: "ABC Design Inc.",
+              first_name: "John",
+              last_name: "Doe"
+            },
+            output: {
+              code: "ABCDESIGNINC"
+            }
           },
           {
-            input: { name: "abc design" },
-            output: "ABCDESIGN"
+            input: { 
+              email: "jane@example.com",
+              first_name: "Jane",
+              last_name: "Smith"
+            },
+            output: {
+              code: "JANESMITH"
+            }
           }
         ]
       },
