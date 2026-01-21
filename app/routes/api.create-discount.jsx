@@ -1,7 +1,7 @@
 import db from "../db.server";
 
 const FUNCTION_NAME = "union-klaviyo-discount-function";
-const KLAVIYO_API_KEY = "pk_1c4122fec9e017680bdde6aac5a7893a10";
+const KLAVIYO_API_KEY = process.env.KLAVIYO_API_KEY || "";
 const KLAVIYO_EVENTS_ENDPOINT = "https://a.klaviyo.com/api/events";
 
 async function createKlaviyoEvent(data) {
