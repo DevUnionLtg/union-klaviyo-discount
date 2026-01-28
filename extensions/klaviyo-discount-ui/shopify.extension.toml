@@ -4,9 +4,6 @@ api_version = "2025-04"
 name = "t:name"
 description = "t:description"
 handle = "klaviyo-discount-ui"
-
-uid = "7026a15e-3219-00e0-9236-a1cea65482b0bedafdfc"
-
 type = "ui_extension"
 
 [[extensions.targeting]]

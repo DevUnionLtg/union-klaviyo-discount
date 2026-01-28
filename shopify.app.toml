@@ -1,13 +1,12 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "2539ee33b557aa51569cfbb14290a4d5"
+client_id = "d05726595c988d0537d6f90d47e0f6ff"
 name = "union-klaviyo-discount"
 application_url = "https://union-klaviyo-discount-production.up.railway.app"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
 [webhooks]
 api_version = "2026-01"
@@ -26,3 +25,4 @@ scopes = "write_products, write_discounts"
 
 [auth]
 redirect_urls = [ "https://union-klaviyo-discount-production.up.railway.app/auth/callback" ]
+
